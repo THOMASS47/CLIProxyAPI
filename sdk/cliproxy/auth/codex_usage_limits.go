@@ -3,6 +3,7 @@ package auth
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 )
@@ -12,23 +13,23 @@ const (
 	codexWeeklyWindowMinutes   = 7 * 24 * 60
 )
 
-type codexUsageLimits struct {
+type codexUsageCeilings struct {
 	fiveHour float64
 	weekly   float64
 }
 
-func codexUsageLimitsFromOptions(opts cliproxyexecutor.Options) codexUsageLimits {
-	return codexUsageLimits{
-		fiveHour: metadataUsageLimitPercent(opts.Metadata, cliproxyexecutor.CodexFiveHourUsageLimitPercentMetadataKey),
-		weekly:   metadataUsageLimitPercent(opts.Metadata, cliproxyexecutor.CodexWeeklyUsageLimitPercentMetadataKey),
+func codexUsageCeilingsFromOptions(opts cliproxyexecutor.Options) codexUsageCeilings {
+	return codexUsageCeilings{
+		fiveHour: metadataUsageCeilingPercent(opts.Metadata, cliproxyexecutor.CodexFiveHourUsageCeilingPercentMetadataKey),
+		weekly:   metadataUsageCeilingPercent(opts.Metadata, cliproxyexecutor.CodexWeeklyUsageCeilingPercentMetadataKey),
 	}
 }
 
-func (l codexUsageLimits) configured() bool {
-	return l.fiveHour > 0 || l.weekly > 0
+func (c codexUsageCeilings) configured() bool {
+	return c.fiveHour > 0 || c.weekly > 0
 }
 
-func metadataUsageLimitPercent(metadata map[string]any, key string) float64 {
+func metadataUsageCeilingPercent(metadata map[string]any, key string) float64 {
 	if len(metadata) == 0 {
 		return 0
 	}
@@ -61,36 +62,61 @@ func metadataUsageLimitPercent(metadata map[string]any, key string) float64 {
 	return value
 }
 
-func codexUsageLimitAllowsAuth(auth *Auth, opts cliproxyexecutor.Options) bool {
-	limits := codexUsageLimitsFromOptions(opts)
-	if !limits.configured() || auth == nil || !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
+func codexUsageCeilingAllowsAuth(auth *Auth, opts cliproxyexecutor.Options) bool {
+	ceilings := codexUsageCeilingsFromOptions(opts)
+	if !ceilings.configured() || auth == nil || !strings.EqualFold(strings.TrimSpace(auth.Provider), "codex") {
 		return true
 	}
-	if limits.fiveHour > 0 {
-		if used, ok := codexQuotaUsedPercentForWindow(auth.Quota.Signals, codexFiveHourWindowMinutes); ok && used >= limits.fiveHour {
+	now := time.Now()
+	if ceilings.fiveHour > 0 {
+		if used, ok := codexQuotaUsedPercentForWindow(auth.Quota, codexFiveHourWindowMinutes, now); ok && used >= ceilings.fiveHour {
 			return false
 		}
 	}
-	if limits.weekly > 0 {
-		if used, ok := codexQuotaUsedPercentForWindow(auth.Quota.Signals, codexWeeklyWindowMinutes); ok && used >= limits.weekly {
+	if ceilings.weekly > 0 {
+		if used, ok := codexQuotaUsedPercentForWindow(auth.Quota, codexWeeklyWindowMinutes, now); ok && used >= ceilings.weekly {
 			return false
 		}
 	}
 	return true
 }
 
-func codexQuotaUsedPercentForWindow(signals map[string]string, windowMinutes int) (float64, bool) {
+func codexQuotaUsedPercentForWindow(quota QuotaState, windowMinutes int, now time.Time) (float64, bool) {
 	for _, window := range []string{"Primary", "Secondary"} {
 		prefix := "X-Codex-" + window + "-"
-		minutes, errMinutes := strconv.Atoi(strings.TrimSpace(signals[prefix+"Window-Minutes"]))
+		minutes, errMinutes := strconv.Atoi(strings.TrimSpace(quota.Signals[prefix+"Window-Minutes"]))
 		if errMinutes != nil || minutes != windowMinutes {
 			continue
 		}
-		used, errUsed := strconv.ParseFloat(strings.TrimSpace(signals[prefix+"Used-Percent"]), 64)
+
+		if codexQuotaWindowReset(quota, prefix, now) {
+			return 0, true
+		}
+
+		used, errUsed := strconv.ParseFloat(strings.TrimSpace(quota.Signals[prefix+"Used-Percent"]), 64)
 		if errUsed != nil || used < 0 || used > 100 {
 			continue
 		}
 		return used, true
 	}
 	return 0, false
+}
+
+func codexQuotaWindowReset(quota QuotaState, prefix string, now time.Time) bool {
+	if now.IsZero() {
+		now = time.Now()
+	}
+
+	if resetAt, err := strconv.ParseInt(strings.TrimSpace(quota.Signals[prefix+"Reset-At"]), 10, 64); err == nil && resetAt > 0 {
+		return !now.Before(time.Unix(resetAt, 0))
+	}
+
+	if quota.ObservedAt.IsZero() {
+		return false
+	}
+	resetAfterSeconds, err := strconv.ParseInt(strings.TrimSpace(quota.Signals[prefix+"Reset-After-Seconds"]), 10, 64)
+	if err != nil || resetAfterSeconds <= 0 {
+		return false
+	}
+	return !now.Before(quota.ObservedAt.Add(time.Duration(resetAfterSeconds) * time.Second))
 }
