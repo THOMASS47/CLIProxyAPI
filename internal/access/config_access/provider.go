@@ -3,6 +3,7 @@ package configaccess
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 
 	sdkaccess "github.com/router-for-me/CLIProxyAPI/v8/sdk/access"
@@ -24,16 +25,22 @@ func Register(cfg *sdkconfig.SDKConfig) {
 
 	sdkaccess.RegisterProvider(
 		sdkaccess.AccessProviderTypeConfigAPIKey,
-		newProvider(sdkaccess.DefaultAccessProviderName, keys),
+		newProvider(sdkaccess.DefaultAccessProviderName, keys, cfg.CodexUsageLimits),
 	)
 }
 
+const (
+	codexFiveHourUsageLimitMetadataKey = "codex_5h_usage_limit_percent"
+	codexWeeklyUsageLimitMetadataKey   = "codex_weekly_usage_limit_percent"
+)
+
 type provider struct {
-	name string
-	keys map[string]struct{}
+	name   string
+	keys   map[string]struct{}
+	limits map[string]sdkconfig.CodexUsageLimit
 }
 
-func newProvider(name string, keys []string) *provider {
+func newProvider(name string, keys []string, limits map[string]sdkconfig.CodexUsageLimit) *provider {
 	providerName := strings.TrimSpace(name)
 	if providerName == "" {
 		providerName = sdkaccess.DefaultAccessProviderName
@@ -42,7 +49,17 @@ func newProvider(name string, keys []string) *provider {
 	for _, key := range keys {
 		keySet[key] = struct{}{}
 	}
-	return &provider{name: providerName, keys: keySet}
+	limitSet := make(map[string]sdkconfig.CodexUsageLimit)
+	for key, limit := range limits {
+		key = strings.TrimSpace(key)
+		if _, ok := keySet[key]; !ok {
+			continue
+		}
+		if validUsageLimitPercent(limit.FiveHourPercent) || validUsageLimitPercent(limit.WeeklyPercent) {
+			limitSet[key] = limit
+		}
+	}
+	return &provider{name: providerName, keys: keySet, limits: limitSet}
 }
 
 func (p *provider) Identifier() string {
@@ -90,12 +107,19 @@ func (p *provider) Authenticate(_ context.Context, r *http.Request) (*sdkaccess.
 			continue
 		}
 		if _, ok := p.keys[candidate.value]; ok {
+			metadata := map[string]string{"source": candidate.source}
+			if limit, exists := p.limits[candidate.value]; exists {
+				if validUsageLimitPercent(limit.FiveHourPercent) {
+					metadata[codexFiveHourUsageLimitMetadataKey] = strconv.FormatFloat(limit.FiveHourPercent, 'f', -1, 64)
+				}
+				if validUsageLimitPercent(limit.WeeklyPercent) {
+					metadata[codexWeeklyUsageLimitMetadataKey] = strconv.FormatFloat(limit.WeeklyPercent, 'f', -1, 64)
+				}
+			}
 			return &sdkaccess.Result{
 				Provider:  p.Identifier(),
 				Principal: candidate.value,
-				Metadata: map[string]string{
-					"source": candidate.source,
-				},
+				Metadata: metadata,
 			}, nil
 		}
 	}
@@ -138,4 +162,8 @@ func normalizeKeys(keys []string) []string {
 		return nil
 	}
 	return normalized
+}
+
+func validUsageLimitPercent(value float64) bool {
+	return value > 0 && value <= 100
 }
