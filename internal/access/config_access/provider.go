@@ -25,7 +25,7 @@ func Register(cfg *sdkconfig.SDKConfig) {
 
 	sdkaccess.RegisterProvider(
 		sdkaccess.AccessProviderTypeConfigAPIKey,
-		newProvider(sdkaccess.DefaultAccessProviderName, keys, cfg.CodexUsageLimits),
+		newProvider(sdkaccess.DefaultAccessProviderName, keys, cfg.CodexUsageCeilings),
 	)
 }
 
@@ -37,10 +37,10 @@ const (
 type provider struct {
 	name   string
 	keys   map[string]struct{}
-	limits map[string]sdkconfig.CodexUsageLimit
+	ceilings map[string]sdkconfig.CodexUsageCeiling
 }
 
-func newProvider(name string, keys []string, limits map[string]sdkconfig.CodexUsageLimit) *provider {
+func newProvider(name string, keys []string, ceilings map[string]sdkconfig.CodexUsageCeiling) *provider {
 	providerName := strings.TrimSpace(name)
 	if providerName == "" {
 		providerName = sdkaccess.DefaultAccessProviderName
@@ -49,17 +49,17 @@ func newProvider(name string, keys []string, limits map[string]sdkconfig.CodexUs
 	for _, key := range keys {
 		keySet[key] = struct{}{}
 	}
-	limitSet := make(map[string]sdkconfig.CodexUsageLimit)
-	for key, limit := range limits {
+	ceilingSet := make(map[string]sdkconfig.CodexUsageCeiling)
+	for key, ceiling := range ceilings {
 		key = strings.TrimSpace(key)
 		if _, ok := keySet[key]; !ok {
 			continue
 		}
-		if validUsageLimitPercent(limit.FiveHourPercent) || validUsageLimitPercent(limit.WeeklyPercent) {
-			limitSet[key] = limit
+		if validUsageLimitPercent(ceiling.FiveHourPercent) || validUsageLimitPercent(ceiling.WeeklyPercent) {
+			ceilingSet[key] = ceiling
 		}
 	}
-	return &provider{name: providerName, keys: keySet, limits: limitSet}
+	return &provider{name: providerName, keys: keySet, ceilings: ceilingSet}
 }
 
 func (p *provider) Identifier() string {
@@ -108,12 +108,12 @@ func (p *provider) Authenticate(_ context.Context, r *http.Request) (*sdkaccess.
 		}
 		if _, ok := p.keys[candidate.value]; ok {
 			metadata := map[string]string{"source": candidate.source}
-			if limit, exists := p.limits[candidate.value]; exists {
-				if validUsageLimitPercent(limit.FiveHourPercent) {
-					metadata[codexFiveHourUsageLimitMetadataKey] = strconv.FormatFloat(limit.FiveHourPercent, 'f', -1, 64)
+			if ceiling, exists := p.ceilings[candidate.value]; exists {
+				if validUsageLimitPercent(ceiling.FiveHourPercent) {
+					metadata[codexFiveHourUsageLimitMetadataKey] = strconv.FormatFloat(ceiling.FiveHourPercent, 'f', -1, 64)
 				}
-				if validUsageLimitPercent(limit.WeeklyPercent) {
-					metadata[codexWeeklyUsageLimitMetadataKey] = strconv.FormatFloat(limit.WeeklyPercent, 'f', -1, 64)
+				if validUsageLimitPercent(ceiling.WeeklyPercent) {
+					metadata[codexWeeklyUsageLimitMetadataKey] = strconv.FormatFloat(ceiling.WeeklyPercent, 'f', -1, 64)
 				}
 			}
 			return &sdkaccess.Result{
