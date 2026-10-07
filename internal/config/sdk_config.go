@@ -62,9 +62,11 @@ type SDKConfig struct {
 	// APIKeys is a list of keys for authenticating clients to this proxy server.
 	APIKeys []string `yaml:"api-keys" json:"api-keys"`
 
-	// CodexUsageLimits optionally caps Codex account quota usage for individual client API keys.
-	// Limits are percentages of the upstream Codex 5-hour and weekly windows.
-	CodexUsageLimits map[string]CodexUsageLimit `yaml:"codex-usage-limits,omitempty" json:"codex-usage-limits,omitempty"`
+	// CodexUsageCeilings optionally stops individual client API keys from selecting
+	// Codex credentials once the upstream account reaches configured used-percent
+	// ceilings. This is intended to reserve the remaining account quota before
+	// fallback credits are used; it is not a per-key consumption budget.
+	CodexUsageCeilings map[string]CodexUsageCeiling `yaml:"codex-usage-ceilings,omitempty" json:"codex-usage-ceilings,omitempty"`
 
 	// PassthroughHeaders controls whether upstream response headers are forwarded to downstream clients.
 	// Default is false (disabled).
@@ -78,9 +80,10 @@ type SDKConfig struct {
 	NonStreamKeepAliveInterval int `yaml:"nonstream-keepalive-interval,omitempty" json:"nonstream-keepalive-interval,omitempty"`
 }
 
-// CodexUsageLimit defines client API-key ceilings for Codex quota windows.
+// CodexUsageCeiling defines stop-at used-percent thresholds for Codex quota windows.
+// For example, 95 on the 5-hour window preserves roughly the final 5% for credits.
 // Values <= 0 disable that window; positive values are percentages in the range (0, 100].
-type CodexUsageLimit struct {
+type CodexUsageCeiling struct {
 	FiveHourPercent float64 `yaml:"five-hour-percent,omitempty" json:"five-hour-percent,omitempty"`
 	WeeklyPercent   float64 `yaml:"weekly-percent,omitempty" json:"weekly-percent,omitempty"`
 }
