@@ -21,6 +21,12 @@ const DisallowFreeAuthMetadataKey = "disallow_free_auth"
 // AuthSelectionModelMetadataKey overrides the model used only for auth selection.
 const AuthSelectionModelMetadataKey = "auth_selection_model"
 
+// CodexFiveHourUsageCeilingPercentMetadataKey sets the stop-at used-percent ceiling for the reported Codex 5-hour window.
+const CodexFiveHourUsageCeilingPercentMetadataKey = "codex_5h_usage_ceiling_percent"
+
+// CodexWeeklyUsageCeilingPercentMetadataKey sets the stop-at used-percent ceiling for the reported Codex weekly window.
+const CodexWeeklyUsageCeilingPercentMetadataKey = "codex_weekly_usage_ceiling_percent"
+
 // ReasoningEffortMetadataKey stores the client-requested reasoning effort for usage logs.
 const ReasoningEffortMetadataKey = "reasoning_effort"
 

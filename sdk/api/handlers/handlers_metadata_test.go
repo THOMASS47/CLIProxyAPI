@@ -323,3 +323,23 @@ func TestEnrichContextWithSessionHierarchyFromBody(t *testing.T) {
 		t.Fatalf("OpenCode parent_id session = (%q, %q), want (session:opencode-sess-1, session:opencode-root-1)", meta8.SessionID, meta8.ParentSessionID)
 	}
 }
+
+func TestRequestExecutionMetadataIncludesCodexUsageCeilings(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ginCtx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ginCtx.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	ginCtx.Set("accessMetadata", map[string]string{
+		"codex_5h_usage_ceiling_percent":     "95",
+		"codex_weekly_usage_ceiling_percent": "98",
+	})
+	ctx := context.WithValue(context.Background(), "gin", ginCtx)
+
+	meta := requestExecutionMetadata(ctx)
+
+	if got := meta[coreexecutor.CodexFiveHourUsageCeilingPercentMetadataKey]; got != 95.0 {
+		t.Fatalf("5-hour ceiling metadata = %v, want 95", got)
+	}
+	if got := meta[coreexecutor.CodexWeeklyUsageCeilingPercentMetadataKey]; got != 98.0 {
+		t.Fatalf("weekly ceiling metadata = %v, want 98", got)
+	}
+}

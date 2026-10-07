@@ -933,3 +933,29 @@ func TestV8SecretHashResolvesReferences(t *testing.T) {
 		})
 	}
 }
+
+func TestV8CodexUsageCeilingsReachRuntimeConfig(t *testing.T) {
+	raw := []byte(`config-version: 8
+access:
+  api-keys: [limited]
+  codex-usage-ceilings:
+    limited:
+      five-hour-percent: 95
+      weekly-percent: 98
+`)
+
+	cfg, err := ParseConfigBytes(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ceiling, ok := cfg.CodexUsageCeilings["limited"]
+	if !ok {
+		t.Fatal("Codex usage ceiling did not reach runtime config")
+	}
+	if ceiling.FiveHourPercent != 95 || ceiling.WeeklyPercent != 98 {
+		t.Fatalf("Codex usage ceiling = %+v, want 95/98", ceiling)
+	}
+	if err = ValidateV8Config(raw); err != nil {
+		t.Fatalf("Codex usage ceiling rejected by v8 validation: %v", err)
+	}
+}

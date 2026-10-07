@@ -100,6 +100,18 @@ access:
     - "your-api-key-2"
     - "your-api-key-3"
 
+  # Optional per-client Codex account usage ceilings.
+  # These are stop-at percentages of the upstream account quota, not per-key budgets.
+  # The ceiling is checked before each request using the latest observed Codex quota headers.
+  # A single long request can overshoot the threshold because its updated quota is only known afterward.
+  #
+  # Example: preserve roughly the last 5% of the 5-hour quota and last 2% of the weekly quota
+  # so normal requests stop before fallback credits are needed.
+  # codex-usage-ceilings:
+  #   "your-api-key-1":
+  #     five-hour-percent: 95
+  #     weekly-percent: 98
+
 # Optional credential concurrency and observation contracts.
 
 # credentials:

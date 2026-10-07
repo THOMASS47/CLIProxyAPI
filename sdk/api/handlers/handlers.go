@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -248,10 +249,37 @@ func requestExecutionMetadata(ctx context.Context) map[string]any {
 	if callerScope := requestCallerScope(ginCtx); callerScope != "" {
 		meta[coreexecutor.CallerScopeMetadataKey] = callerScope
 	}
+	copyCodexUsageCeilingMetadata(meta, ginCtx)
 	if disallowFreeAuthFromContext(ctx) {
 		meta[coreexecutor.DisallowFreeAuthMetadataKey] = true
 	}
 	return meta
+}
+
+func copyCodexUsageCeilingMetadata(meta map[string]any, ginCtx *gin.Context) {
+	if meta == nil || ginCtx == nil {
+		return
+	}
+	raw, ok := ginCtx.Get("accessMetadata")
+	if !ok || raw == nil {
+		return
+	}
+	for sourceKey, targetKey := range map[string]string{
+		"codex_5h_usage_ceiling_percent": coreexecutor.CodexFiveHourUsageCeilingPercentMetadataKey,
+		"codex_weekly_usage_ceiling_percent": coreexecutor.CodexWeeklyUsageCeilingPercentMetadataKey,
+	} {
+		value := ""
+		switch typed := raw.(type) {
+		case map[string]string:
+			value = typed[sourceKey]
+		case map[string]any:
+			value = fmt.Sprint(typed[sourceKey])
+		}
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		if err == nil && parsed > 0 && parsed <= 100 {
+			meta[targetKey] = parsed
+		}
+	}
 }
 
 func requestClientIP(request *http.Request) string {
