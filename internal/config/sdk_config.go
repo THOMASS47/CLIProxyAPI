@@ -62,6 +62,10 @@ type SDKConfig struct {
 	// APIKeys is a list of keys for authenticating clients to this proxy server.
 	APIKeys []string `yaml:"api-keys" json:"api-keys"`
 
+	// CodexUsageLimits optionally caps Codex account quota usage for individual client API keys.
+	// Limits are percentages of the upstream Codex 5-hour and weekly windows.
+	CodexUsageLimits map[string]CodexUsageLimit `yaml:"codex-usage-limits,omitempty" json:"codex-usage-limits,omitempty"`
+
 	// PassthroughHeaders controls whether upstream response headers are forwarded to downstream clients.
 	// Default is false (disabled).
 	PassthroughHeaders bool `yaml:"passthrough-headers" json:"passthrough-headers"`
@@ -72,6 +76,13 @@ type SDKConfig struct {
 	// NonStreamKeepAliveInterval controls how often blank lines are emitted for non-streaming responses.
 	// <= 0 disables keep-alives. Value is in seconds.
 	NonStreamKeepAliveInterval int `yaml:"nonstream-keepalive-interval,omitempty" json:"nonstream-keepalive-interval,omitempty"`
+}
+
+// CodexUsageLimit defines client API-key ceilings for Codex quota windows.
+// Values <= 0 disable that window; positive values are percentages in the range (0, 100].
+type CodexUsageLimit struct {
+	FiveHourPercent float64 `yaml:"five-hour-percent,omitempty" json:"five-hour-percent,omitempty"`
+	WeeklyPercent   float64 `yaml:"weekly-percent,omitempty" json:"weekly-percent,omitempty"`
 }
 
 // ClientConfig configures client-facing compatibility behavior.
