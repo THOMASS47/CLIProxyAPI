@@ -30,13 +30,13 @@ func Register(cfg *sdkconfig.SDKConfig) {
 }
 
 const (
-	codexFiveHourUsageLimitMetadataKey = "codex_5h_usage_limit_percent"
-	codexWeeklyUsageLimitMetadataKey   = "codex_weekly_usage_limit_percent"
+	codexFiveHourUsageCeilingMetadataKey = "codex_5h_usage_ceiling_percent"
+	codexWeeklyUsageCeilingMetadataKey   = "codex_weekly_usage_ceiling_percent"
 )
 
 type provider struct {
-	name   string
-	keys   map[string]struct{}
+	name     string
+	keys     map[string]struct{}
 	ceilings map[string]sdkconfig.CodexUsageCeiling
 }
 
@@ -55,7 +55,7 @@ func newProvider(name string, keys []string, ceilings map[string]sdkconfig.Codex
 		if _, ok := keySet[key]; !ok {
 			continue
 		}
-		if validUsageLimitPercent(ceiling.FiveHourPercent) || validUsageLimitPercent(ceiling.WeeklyPercent) {
+		if validUsageCeilingPercent(ceiling.FiveHourPercent) || validUsageCeilingPercent(ceiling.WeeklyPercent) {
 			ceilingSet[key] = ceiling
 		}
 	}
@@ -109,11 +109,11 @@ func (p *provider) Authenticate(_ context.Context, r *http.Request) (*sdkaccess.
 		if _, ok := p.keys[candidate.value]; ok {
 			metadata := map[string]string{"source": candidate.source}
 			if ceiling, exists := p.ceilings[candidate.value]; exists {
-				if validUsageLimitPercent(ceiling.FiveHourPercent) {
-					metadata[codexFiveHourUsageLimitMetadataKey] = strconv.FormatFloat(ceiling.FiveHourPercent, 'f', -1, 64)
+				if validUsageCeilingPercent(ceiling.FiveHourPercent) {
+					metadata[codexFiveHourUsageCeilingMetadataKey] = strconv.FormatFloat(ceiling.FiveHourPercent, 'f', -1, 64)
 				}
-				if validUsageLimitPercent(ceiling.WeeklyPercent) {
-					metadata[codexWeeklyUsageLimitMetadataKey] = strconv.FormatFloat(ceiling.WeeklyPercent, 'f', -1, 64)
+				if validUsageCeilingPercent(ceiling.WeeklyPercent) {
+					metadata[codexWeeklyUsageCeilingMetadataKey] = strconv.FormatFloat(ceiling.WeeklyPercent, 'f', -1, 64)
 				}
 			}
 			return &sdkaccess.Result{
@@ -164,6 +164,6 @@ func normalizeKeys(keys []string) []string {
 	return normalized
 }
 
-func validUsageLimitPercent(value float64) bool {
+func validUsageCeilingPercent(value float64) bool {
 	return value > 0 && value <= 100
 }
