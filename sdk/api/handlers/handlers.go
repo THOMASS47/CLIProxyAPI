@@ -249,14 +249,14 @@ func requestExecutionMetadata(ctx context.Context) map[string]any {
 	if callerScope := requestCallerScope(ginCtx); callerScope != "" {
 		meta[coreexecutor.CallerScopeMetadataKey] = callerScope
 	}
-	copyCodexUsageLimitMetadata(meta, ginCtx)
+	copyCodexUsageCeilingMetadata(meta, ginCtx)
 	if disallowFreeAuthFromContext(ctx) {
 		meta[coreexecutor.DisallowFreeAuthMetadataKey] = true
 	}
 	return meta
 }
 
-func copyCodexUsageLimitMetadata(meta map[string]any, ginCtx *gin.Context) {
+func copyCodexUsageCeilingMetadata(meta map[string]any, ginCtx *gin.Context) {
 	if meta == nil || ginCtx == nil {
 		return
 	}
@@ -265,8 +265,8 @@ func copyCodexUsageLimitMetadata(meta map[string]any, ginCtx *gin.Context) {
 		return
 	}
 	for sourceKey, targetKey := range map[string]string{
-		"codex_5h_usage_limit_percent": coreexecutor.CodexFiveHourUsageLimitPercentMetadataKey,
-		"codex_weekly_usage_limit_percent": coreexecutor.CodexWeeklyUsageLimitPercentMetadataKey,
+		"codex_5h_usage_ceiling_percent": coreexecutor.CodexFiveHourUsageCeilingPercentMetadataKey,
+		"codex_weekly_usage_ceiling_percent": coreexecutor.CodexWeeklyUsageCeilingPercentMetadataKey,
 	} {
 		value := ""
 		switch typed := raw.(type) {
