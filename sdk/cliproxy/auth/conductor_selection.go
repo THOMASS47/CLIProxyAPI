@@ -1764,7 +1764,7 @@ func (m *Manager) pickNextLegacy(ctx context.Context, provider, model string, op
 		if !eligibility.allows(candidate) {
 			continue
 		}
-		if !codexUsageLimitAllowsAuth(candidate, opts) {
+		if !codexUsageCeilingAllowsAuth(candidate, opts) {
 			continue
 		}
 		if _, used := tried[candidate.ID]; used {
@@ -1989,7 +1989,7 @@ func (m *Manager) pickNext(ctx context.Context, provider, model string, opts cli
 		auth, exec, _, err := m.pickNextViaHome(ctx, model, opts, tried)
 		return auth, exec, err
 	}
-	if codexUsageLimitsFromOptions(opts).configured() {
+	if codexUsageCeilingsFromOptions(opts).configured() {
 		return m.pickNextLegacy(ctx, provider, model, opts, tried)
 	}
 	opts.Metadata[cliproxyexecutor.SessionAffinityProviderMetadataKey] = provider
@@ -2094,7 +2094,7 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 		if !eligibility.allows(candidate) {
 			continue
 		}
-		if !codexUsageLimitAllowsAuth(candidate, opts) {
+		if !codexUsageCeilingAllowsAuth(candidate, opts) {
 			continue
 		}
 		providerKey := executorKeyFromAuth(candidate)
@@ -2168,7 +2168,7 @@ func (m *Manager) pickNextMixed(ctx context.Context, providers []string, model s
 	if m.HomeEnabled() {
 		return m.pickNextViaHome(ctx, model, opts, tried)
 	}
-	if codexUsageLimitsFromOptions(opts).configured() {
+	if codexUsageCeilingsFromOptions(opts).configured() {
 		return m.pickNextMixedLegacy(ctx, providers, model, opts, tried)
 	}
 	opts.Metadata[cliproxyexecutor.SessionAffinityProviderMetadataKey] = "mixed"
